@@ -1,15 +1,18 @@
 import requests
 from xml.etree import ElementTree as ET
 import re
+import sys
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 
 def get_pm25_siata():
-    # URL CORRECTA (actualizada)
     url = "https://www.siata.gov.co/kml/01_Redes/AMVARedAire/RedAireAMVA_PM25.kml"
     
-    r = requests.get(url, timeout=15, verify=False) # Agregué verify=False por si hay problemas de SSL
+    r = requests.get(url, timeout=15, verify=False)
     r.raise_for_status()
     
-    # Eliminar namespace para simplificar el parsing
     content = re.sub(b'xmlns="[^"]+"', b'', r.content)
     kml = ET.fromstring(content)
     
@@ -17,7 +20,6 @@ def get_pm25_siata():
     for placemark in kml.findall('.//Placemark'):
         nombre = placemark.findtext('name', '').strip()
         
-        # Extraer datos estructurados de ExtendedData
         val = None
         fecha = "Sin fecha"
         
@@ -30,10 +32,11 @@ def get_pm25_siata():
                 if nombre_campo == 'ICA_PM25_Valor':
                     try:
                         val = float(simple_data.text)
+                        if val < 0:
+                            val = None
                     except:
                         val = None
                 
-                # Buscamos la fecha de actualización
                 elif nombre_campo == 'fecha_ultima_actualizacion':
                     fecha = simple_data.text
         
@@ -77,8 +80,6 @@ if __name__ == '__main__':
     print(f"{'Estación':<35} {'PM2.5':>8}   {'Tiempo':<20} Categoría")
     print("-" * 85)
     for e in con_dato:
-        # Mostramos solo la hora (HH:MM:SS) para que la tabla no sea muy ancha
-        # Si prefieres la fecha completa, usa e['fecha']
         hora = e['fecha'].split(' ')[1] if ' ' in e['fecha'] else e['fecha']
         
         print(f"{e['nombre']:<35} {e['pm25']:>6.1f} ICA  [{hora:<8}] {categoria_ica(e['pm25'])}")
